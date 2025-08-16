@@ -1,0 +1,33 @@
+{
+  "name": "empeiria-testnet-bot",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "EMPE testnet bot with Blessed UI integration",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+"keywords": [
+    "nodejs",
+    "ethers",
+    "blockchain",
+    "uomi",
+    "testnet",
+    "bot",
+    "terminal-ui"
+  ],
+"author": "Invictuslabs",
+  "license": "MIT",
+  "dependencies": {
+    "@cosmjs/math": "^0.32.4",
+    "@cosmjs/proto-signing": "^0.32.4",
+    "@cosmjs/stargate": "^0.32.4",
+    "bech32": "^2.0.0",
+    "dotenv": "^16.4.5",
+    "figlet": "^1.7.0",
+    "moment": "^2.30.1",
+    "undici": "^6.19.8",
+    "blessed": "^0.1.81"
+  }
+}
+
