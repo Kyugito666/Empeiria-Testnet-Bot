@@ -19,15 +19,17 @@ const PREFIX    = 'empe';
 const CLAIM_CHUNK = 16;                    
 const BROADCAST_TIMEOUT_MS = 45000;
 
-// ===== Util =====
-const toMicro  = (x) => Decimal.fromUserInput(String(x), EXPONENT).atomics;
+
+const toMicro   = (x) => Decimal.fromUserInput(String(x), EXPONENT).atomics;
 const fromMicro = (a) => Decimal.fromAtomics(String(a || '0'), EXPONENT).toString();
-const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+const sleep     = (ms) => new Promise(r => setTimeout(r, ms));
+
 const genRandomAddress = (prefix = PREFIX) => {
   const data = crypto.randomBytes(20);
   const words = bech32.toWords(data);
   return bech32.encode(prefix, words);
 };
+
 async function lcdJson(url) {
   const r = await fetch(url, { headers: { accept: 'application/json' } });
   if (!r.ok) throw new Error(`LCD ${r.status}`);
@@ -52,7 +54,17 @@ async function getBalance(client, address) {
   return b?.amount || '0';
 }
 
-// ===== Modal input di atas UI =====
+async function fetchAccountMeta(address) {
+  const j = await lcdJson(`${LCD}/cosmos/auth/v1beta1/accounts/${address}`);
+  
+  const acc = j?.account || j?.base_account || j?.baseAccount || {};
+  const base = acc?.base_account || acc;
+  const accountNumber = String(base?.account_number ?? '0');
+  const sequence = String(base?.sequence ?? '0');
+  return { accountNumber, sequence };
+}
+
+
 function askText(ui, label, initial = '') {
   return new Promise((resolve) => {
     const modal = blessed.form({
@@ -75,7 +87,7 @@ function askText(ui, label, initial = '') {
 function askNumber(ui, label, initial = 1) {
   return askText(ui, label, String(initial)).then(v => (v == null ? null : Number(v)));
 }
-function askConfirm(ui, label, def = true) {
+function askConfirm(ui, label) {
   return new Promise((resolve) => {
     const modal = blessed.box({
       parent: ui.screen, keys: true, mouse: true,
@@ -90,7 +102,7 @@ function askConfirm(ui, label, def = true) {
   });
 }
 
-// ===== Inisialisasi UI =====
+
 const ui = new CryptoBotUI({
   title: 'EMPE Testnet Bot',
   tickerText1: 'EMPE TESTNET',
@@ -104,7 +116,7 @@ const ui = new CryptoBotUI({
   nativeSymbol: 'EMPE'
 });
 
-// Statistik sederhana
+
 const stats = { total: 0, ok: 0, fail: 0, pending: 0 };
 function pushStat(ok) {
   stats.total += 1;
@@ -118,12 +130,38 @@ function pushStat(ok) {
   });
 }
 
-// ===== Koneksi CosmJS =====
+
 let client, address;
+async function refreshWalletUI() {
+  if (!client || !address) return;
+  try {
+    const [bal, meta] = await Promise.all([
+      getBalance(client, address),
+      fetchAccountMeta(address)
+    ]);
+    ui.updateWallet({
+      address,
+      nativeBalance: `${fromMicro(bal)} EMPE`,
+      network: `${CHAIN_ID} (RPC: ${RPC})`,
+      gasPrice: GAS_PRICE,
+      nonce: meta.sequence 
+    });
+  } catch (e) {
+
+    const bal = await getBalance(client, address).catch(()=> '0');
+    ui.updateWallet({
+      address,
+      nativeBalance: `${fromMicro(bal)} EMPE`,
+      network: `${CHAIN_ID} (RPC: ${RPC})`,
+      gasPrice: GAS_PRICE,
+      nonce: '-' 
+    });
+  }
+}
 async function connect() {
   const mnemonic = process.env.MNEMONIC;
   if (!mnemonic) {
-    ui.log('error', 'MNEMONIC tidak ditemukan di .env'); 
+    ui.log('error', 'MNEMONIC tidak ditemukan di .env');
     return;
   }
   ui.log('info', `Menghubungkan RPC: ${RPC}`);
@@ -136,18 +174,14 @@ async function connect() {
   const netChainId = await client.getChainId();
   address = acc.address;
   ui.log('success', `Terhubung: ${netChainId}`);
-  const bal = await getBalance(client, address);
-  ui.updateWallet({
-    address,
-    nativeBalance: `${fromMicro(bal)} EMPE`,
-    network: `${CHAIN_ID} (RPC: ${RPC})`,
-    gasPrice: GAS_PRICE,
-    nonce: '-' // sequence akan terpakai otomatis saat broadcast
-  });
+  await refreshWalletUI();
 }
 await connect();
 
-// ===== Handlers menu =====
+
+setInterval(() => { refreshWalletUI(); }, 5000);
+
+
 ui.on('menu:select', async (label) => {
   const text = String(label).toLowerCase();
   if (text.startsWith('1)')) return handleTransfer();
@@ -156,7 +190,7 @@ ui.on('menu:select', async (label) => {
   if (text.startsWith('4)')) return ui.destroy(0);
 });
 
-// === ACTION: Auto Transfer ===
+
 async function handleTransfer() {
   if (!client || !address) return ui.log('error', 'Belum terkoneksi');
   const amount = await askText(ui, 'Jumlah per tx (EMPE)', '0.001');
@@ -185,12 +219,11 @@ async function handleTransfer() {
     await sleep(1000);
   }
 
-  const bal = await getBalance(client, address);
-  ui.updateWallet({ nativeBalance: `${fromMicro(bal)} EMPE` });
+  await refreshWalletUI();
   ui.setActive(false);
 }
 
-// === ACTION: Auto Delegate ===
+
 async function handleDelegate() {
   if (!client || !address) return ui.log('error', 'Belum terkoneksi');
   const amount = await askText(ui, 'Jumlah per delegasi (EMPE)', '0.1');
@@ -203,7 +236,7 @@ async function handleDelegate() {
   let validators = [];
   try {
     validators = await fetchBondedValidators(200);
-    ui.log('info', `Validator sehat/boned: ${validators.length}`);
+    ui.log('info', `Validator bonded: ${validators.length}`);
   } catch (e) {
     ui.log('error', `Gagal ambil validator: ${e.message || e}`);
     ui.setActive(false);
@@ -228,12 +261,11 @@ async function handleDelegate() {
     await sleep(1200);
   }
 
-  const bal = await getBalance(client, address);
-  ui.updateWallet({ nativeBalance: `${fromMicro(bal)} EMPE` });
+  await refreshWalletUI();
   ui.setActive(false);
 }
 
-// === ACTION: Auto Claim Rewards (batch) ===
+
 async function handleClaim() {
   if (!client || !address) return ui.log('error', 'Belum terkoneksi');
   ui.setActive(true);
@@ -248,7 +280,7 @@ async function handleClaim() {
     ui.setActive(false); return;
   }
 
-  // Jangan parse Decimal untuk display total (LCD bisa kirim pecahan panjang)
+
   ui.log('info', `Total (approx, ${DENOM}): ${total}`);
   const validators = perVal.filter(x => Number(x.amount || '0') > 0).map(x => x.validator);
   if (!validators.length) {
@@ -279,7 +311,6 @@ async function handleClaim() {
     await sleep(1200);
   }
 
-  const bal = await getBalance(client, address);
-  ui.updateWallet({ nativeBalance: `${fromMicro(bal)} EMPE` });
+  await refreshWalletUI();
   ui.setActive(false);
 }
