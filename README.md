@@ -6,7 +6,7 @@ Bot otomatisasi berbasis Node.js untuk **Empeiria Testnet (chain berbasis Cosmos
 
 # Tutorial Lengkap & Komunitas: Gabung Channel Telegram [Invictuslabs](https://t.me/invictuslabs)
 
-\<img width="1467" height="797" alt="Screenshot 2025-08-16 152526" src="[https://github.com/user-attachments/assets/2ef494aa-53ef-41aa-a947-52dabad8fafe](https://github.com/user-attachments/assets/2ef494aa-53ef-41aa-a947-52dabad8fafe)" /\>
+<img width="1467" height="797" alt="Screenshot 2025-08-16 152526" src="https://github.com/user-attachments/assets/2ef494aa-53ef-41aa-a947-52dabad8fafe" />
 
 -----
 
@@ -37,6 +37,10 @@ Bot ini menyediakan beberapa fitur inti yang berjalan secara otomatis untuk semu
 1.  *Clone* atau unduh repositori ini.
 2.  Buka terminal di dalam folder proyek.
 3.  Jalankan perintah ini untuk menginstal semua paket yang dibutuhkan:
+    ```bash
+    git clone https://github.com/Kyugito666/Empeiria-Testnet-Bot
+    cd Empeiria-Testnet-Bot
+    ```
     ```bash
     npm install
     ```
